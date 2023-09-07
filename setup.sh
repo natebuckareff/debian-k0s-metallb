@@ -23,21 +23,71 @@ done
 ./setup_network.sh
 
 # Install k0s
+set +e
 ./setup_k0sctl_config.sh | tee ./k0sctl.yaml | k0sctl apply --config -
+set -e
 
 # Get and merge kubeconfig
 k0sctl kubeconfig > kubeconfig
 export KUBECONFIG="./kubeconfig"
 kubectl config view --flatten > ~/.kube/config
 
-# Setup load balancer address pool
-export LB_IP_POOL
+wait_for() {
+    echo "Waiting for $1"
+    shift
+    while true; do
+        kubectl wait $@
+        if [[ $? = 0 ]]; then
+            break
+        fi
+    done
+}
+
+wait_for 'kube-dns' \
+    --namespace kube-system \
+    --for=condition=ready pod -l k8s-app=kube-dns \
+    --timeout 300s
+
+wait_for 'kube-proxy' \
+    --namespace kube-system \
+    --for=condition=ready pod -l k8s-app=kube-proxy \
+    --timeout 300s
+
+wait_for 'kube-router' \
+    --namespace kube-system \
+    --for=condition=ready pod -l k8s-app=kube-router \
+    --timeout 300s
+
+wait_for 'metrics-server' \
+    --namespace kube-system \
+    --for=condition=ready pod -l k8s-app=metrics-server \
+    --timeout 300s
+
+echo "Applying load balancer address pool"
+
 envsubst < ./metallb-l2-pool.yaml | kubectl apply -f -
 
-## Before installing the ingress controller, test that the load balancer was setup
-#kubectl apply -f test-load-balancer-service.yaml
-#kubectl wait --for=condition=ready svc test-load-balancer
-#kubectl delete -f test-load-balancer-service.yaml
+wait_for 'metallb controller' \
+    --namespace metallb \
+    --for=condition=ready pod \
+    -l app.kubernetes.io/instance=metallb \
+    -l app.kubernetes.io/component=controller \
+    --timeout 300s
 
-# Install ingress-nginx
+wait_for 'metallb speaker' \
+    --namespace metallb \
+    --for=condition=ready pod \
+    -l app.kubernetes.io/instance=metallb \
+    -l app.kubernetes.io/component=speaker \
+    --timeout 300s
+
+echo "Installing ingress-nginx"
+
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
+
+wait_for 'ingress controller' \
+    --namespace ingress-nginx \
+    --for=condition=ready pod \
+    -l app.kubernetes.io/instance=ingress-nginx \
+    -l app.kubernetes.io/component=controller \
+    --timeout 300s

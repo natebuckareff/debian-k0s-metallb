@@ -26,6 +26,7 @@ for IP in $CONTROLLER_IPS $WORKER_IPS; do
     ssh "root@$IP" 'resolvconf -u'
     ssh "root@$IP" "ifdown $NODE_IFACE && ifup $NODE_IFACE"
 
+    set +e
     while true; do
         echo "Waiting for $IP to come back online..."
         sleep 1
@@ -43,4 +44,5 @@ for IP in $CONTROLLER_IPS $WORKER_IPS; do
             break
         fi
     done
+    set -e
 done
