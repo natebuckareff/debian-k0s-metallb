@@ -1,0 +1,11 @@
+source /etc/network/interfaces.d/*
+
+auto lo
+iface lo inet loopback
+
+allow-hotplug ${NODE_IFACE}
+iface ${NODE_IFACE} inet static
+    address ${NODE_IP}/${NODE_CIDR}
+    gateway ${GATEWAY_IP}
+    dns-search ${DNS_SEARCH}
+    dns-nameservers ${DNS_NAMESERVERS}
