@@ -63,27 +63,10 @@ wait_for 'metrics-server' \
     --for=condition=ready pod -l k8s-app=metrics-server \
     --timeout 300s
 
-echo "Applying load balancer address pool"
-
-envsubst < ./metallb-l2-pool.yaml | kubectl apply -f -
-
-wait_for 'metallb controller' \
-    --namespace metallb \
-    --for=condition=ready pod \
-    -l app.kubernetes.io/instance=metallb \
-    -l app.kubernetes.io/component=controller \
-    --timeout 300s
-
-wait_for 'metallb speaker' \
-    --namespace metallb \
-    --for=condition=ready pod \
-    -l app.kubernetes.io/instance=metallb \
-    -l app.kubernetes.io/component=speaker \
-    --timeout 300s
-
 echo "Installing ingress-nginx"
 
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
+kubectl apply -f \
+  https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/baremetal/deploy.yaml
 
 wait_for 'ingress controller' \
     --namespace ingress-nginx \
